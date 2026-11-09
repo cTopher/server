@@ -162,9 +162,7 @@ class DeezerStreamingManager:
         track_id = str(song_data["SNG_ID"])
         size_key = f"FILESIZE_{url_details['format']}"
         size = int(song_data.get(size_key) or song_data.get("FILESIZE_MP3_MISC") or 0)
-        audio_format = AudioFormat(
-            content_type=ContentType.try_parse(url_details["format"].split("_")[0])
-        )
+        audio_format = _audio_format(url_details["format"])
         if audio_format.content_type == ContentType.FLAC and (
             streaminfo := await self._get_flac_streaminfo(url, track_id, size)
         ):
@@ -275,9 +273,7 @@ class DeezerStreamingManager:
             item_id=item_id,
             provider=self.instance_id,
             media_type=MediaType.AUDIOBOOK,
-            audio_format=AudioFormat(
-                content_type=ContentType.try_parse(first_url_details["format"].split("_")[0])
-            ),
+            audio_format=_audio_format(first_url_details["format"]),
             stream_type=StreamType.CUSTOM,
             duration=total_duration,
             data={
@@ -681,3 +677,11 @@ def _raise_stream_error(err: DeezerGWError, item_id: str, label: str) -> NoRetur
     if isinstance(api_errors, list) and api_errors and api_errors[0].get("code") == 2002:
         raise MediaNotFoundError(f"{label} {item_id} is not available on Deezer") from err
     raise AudioError(str(err)) from err
+
+
+def _audio_format(deezer_format: str) -> AudioFormat:
+    """Return the audio format of a Deezer format name, with the bit rate an MP3 name carries."""
+    return AudioFormat(
+        content_type=ContentType.try_parse(deezer_format.split("_", maxsplit=1)[0]),
+        bit_rate={"MP3_320": 320, "MP3_128": 128}.get(deezer_format),
+    )
